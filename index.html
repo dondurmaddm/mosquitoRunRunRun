@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蚊子快跑</title>
+    <link rel="icon" type="image/png" href="media/image/icon.png">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+            height: 100vh;
+        }
+        
+        #mosquito {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        
+        #overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+        
+        #result {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            z-index: 1001;
+        }
+        
+        #resetBtn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        
+        #audioControl {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 2rem;
+            height: 2rem;
+            cursor: pointer;
+            z-index: 1002;
+            transition: transform 0.2s ease;
+        }
+        
+        #audioControl:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <img id="mosquito" src="media/image/mosquito.png" alt="蚊子">
+    <img id="audioControl" src="media/image/audio.png" alt="音频控制">
+    <div id="overlay"></div>
+    <div id="result">
+        <p id="killMessage"></p>
+        <button id="resetBtn">重新开始</button>
+    </div>
+    <audio id="bgAudio" loop>
+        <source src="media/audio/mosquito.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="killAudio">
+        <source src="media/audio/kill.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let startTime = new Date();
+        let mosquitoElement = document.getElementById('mosquito');
+        let overlayElement = document.getElementById('overlay');
+        let resultElement = document.getElementById('result');
+        let killMessageElement = document.getElementById('killMessage');
+        let resetBtn = document.getElementById('resetBtn');
+        let moveInterval; // 添加一个变量来存储interval ID
+        let audioControl = document.getElementById('audioControl');
+        let bgAudio = document.getElementById('bgAudio');
+        let killAudio = document.getElementById('killAudio');
+        let isPlaying = true;
+        
+        function moveMosquito() {
+            const currentX = parseInt(mosquitoElement.style.left) || 0;
+            const currentY = parseInt(mosquitoElement.style.top) || 0;
+            
+            // 增加移动范围到200像素
+            const moveRange = 200;
+            const randomX = Math.max(0, Math.min(
+                currentX + (Math.random() * moveRange * 2 - moveRange),
+                window.innerWidth - 50
+            ));
+            const randomY = Math.max(0, Math.min(
+                currentY + (Math.random() * moveRange * 2 - moveRange),
+                window.innerHeight - 50
+            ));
+            
+            mosquitoElement.style.left = randomX + 'px';
+            mosquitoElement.style.top = randomY + 'px';
+        }
+        
+        function startMoving() {
+            moveMosquito();
+
+            moveInterval = setInterval(moveMosquito, 400);
+        }
+        
+        mosquitoElement.addEventListener('click', function() {
+            // 清除移动interval
+            clearInterval(moveInterval);
+            
+            // 播放击杀音效
+            killAudio.currentTime = 0; // 确保从头开始播放
+            killAudio.play();
+            
+            // 如果背景音乐正在播放，停止它并更新图标
+            if (isPlaying) {
+                bgAudio.pause();
+                audioControl.src = 'media/image/no_audio.png';
+                isPlaying = false;
+            }
+            
+            const endTime = new Date();
+            const timeTaken = (endTime - startTime) / 1000;
+            
+            mosquitoElement.src = 'media/image/mosquito_killed.png';
+            setTimeout(() => {
+                overlayElement.style.display = 'block';
+                setTimeout(() => {
+                    overlayElement.style.opacity = '1';
+                }, 50);
+                resultElement.style.display = 'block';
+                killMessageElement.textContent = `你 击杀了 蚊子\n用时：${timeTaken.toFixed(2)}秒`;
+            }, 1500);
+        });
+        
+        function resetGame() {
+            startTime = new Date();
+            overlayElement.style.display = 'none';
+            overlayElement.style.opacity = '0'; // 重置遮罩透明度
+            resultElement.style.display = 'none';
+            mosquitoElement.src = 'media/image/mosquito.png';
+            mosquitoElement.style.display = 'block';
+            
+            // 设置蚊子初始位置为屏幕中央
+            mosquitoElement.style.left = (window.innerWidth / 2 - 25) + 'px';
+            mosquitoElement.style.top = (window.innerHeight / 2 - 25) + 'px';
+            
+            startMoving();
+        }
+        
+        resetBtn.addEventListener('click', resetGame);
+        
+        // 音频控制功能
+        audioControl.addEventListener('click', function() {
+            if (isPlaying) {
+                bgAudio.pause();
+                audioControl.src = 'media/image/no_audio.png';
+            } else {
+                bgAudio.play();
+                audioControl.src = 'media/image/audio.png';
+            }
+            isPlaying = !isPlaying;
+        });
+
+        // 页面加载后自动播放音频
+        window.addEventListener('load', function() {
+            bgAudio.volume = 0.5; // 设置音量为50%
+            bgAudio.play().catch(function(error) {
+                // 处理自动播放被阻止的情况
+                console.log("自动播放被阻止，请点击播放按钮手动开启音频");
+                isPlaying = false;
+                audioControl.src = 'media/image/no_audio.png';
+            });
+        });
+        
+        // 开始游戏
+        startMoving();
+    </script>
+</body>
+</html> 
