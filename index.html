@@ -71,9 +71,20 @@
         #audioControl:hover {
             transform: scale(1.1);
         }
+        
+        #mosquitoCount {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: black;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1002;
+        }
     </style>
 </head>
 <body>
+    <div id="mosquitoCount">当前蚊子：1只</div>
     <img id="mosquito" src="media/image/mosquito.png" alt="蚊子">
     <img id="audioControl" src="media/image/audio.png" alt="音频控制">
     <div id="overlay"></div>
@@ -100,73 +111,106 @@
         let bgAudio = document.getElementById('bgAudio');
         let killAudio = document.getElementById('killAudio');
         let isPlaying = true;
+        let currentMosquitoCount = 1;
+        let killedMosquitoCount = 0;
+        let totalMosquitoes = 1;
+        let mosquitoCountElement = document.getElementById('mosquitoCount');
         
-        function moveMosquito() {
-            const currentX = parseInt(mosquitoElement.style.left) || 0;
-            const currentY = parseInt(mosquitoElement.style.top) || 0;
+        function createNewMosquito() {
+            const newMosquito = mosquitoElement.cloneNode(true);
+            newMosquito.style.left = (window.innerWidth / 2 - 25) + 'px';
+            newMosquito.style.top = (window.innerHeight / 2 - 25) + 'px';
+            document.body.appendChild(newMosquito);
             
-            // 增加移动范围到200像素
-            const moveRange = 200;
-            const randomX = Math.max(0, Math.min(
-                currentX + (Math.random() * moveRange * 2 - moveRange),
-                window.innerWidth - 50
-            ));
-            const randomY = Math.max(0, Math.min(
-                currentY + (Math.random() * moveRange * 2 - moveRange),
-                window.innerHeight - 50
-            ));
+            newMosquito.addEventListener('click', function() {
+                clearInterval(this.moveInterval);
+                
+                killAudio.currentTime = 0;
+                killAudio.play();
+                
+                this.src = 'media/image/mosquito_killed.png';
+                killedMosquitoCount++;
+                
+                if (killedMosquitoCount === totalMosquitoes) {
+                    const endTime = new Date();
+                    const timeTaken = (endTime - startTime) / 1000;
+                    
+                    // 只在击杀所有蚊子后才停止背景音乐
+                    if (isPlaying) {
+                        bgAudio.pause();
+                        audioControl.src = 'media/image/no_audio.png';
+                        isPlaying = false;
+                    }
+                    
+                    setTimeout(() => {
+                        overlayElement.style.display = 'block';
+                        setTimeout(() => {
+                            overlayElement.style.opacity = '1';
+                        }, 50);
+                        resultElement.style.display = 'block';
+                        killMessageElement.textContent = `你击杀了所有蚊子！\n用时：${timeTaken.toFixed(2)}秒`;
+                    }, 1500);
+                }
+            });
             
-            mosquitoElement.style.left = randomX + 'px';
-            mosquitoElement.style.top = randomY + 'px';
+            return newMosquito;
         }
         
         function startMoving() {
-            moveMosquito();
-
-            moveInterval = setInterval(moveMosquito, 400);
+            const mosquitoes = document.querySelectorAll('#mosquito');
+            mosquitoes.forEach(mosquito => {
+                mosquito.moveInterval = setInterval(() => {
+                    const currentX = parseInt(mosquito.style.left) || 0;
+                    const currentY = parseInt(mosquito.style.top) || 0;
+                    
+                    const moveRange = 200;
+                    const randomX = Math.max(0, Math.min(
+                        currentX + (Math.random() * moveRange * 2 - moveRange),
+                        window.innerWidth - 50
+                    ));
+                    const randomY = Math.max(0, Math.min(
+                        currentY + (Math.random() * moveRange * 2 - moveRange),
+                        window.innerHeight - 50
+                    ));
+                    
+                    mosquito.style.left = randomX + 'px';
+                    mosquito.style.top = randomY + 'px';
+                }, 1000);
+            });
         }
         
-        mosquitoElement.addEventListener('click', function() {
-            // 清除移动interval
-            clearInterval(moveInterval);
+        function resetGame() {
+            // 清除所有现有的蚊子
+            const mosquitoes = document.querySelectorAll('#mosquito');
+            mosquitoes.forEach(mosquito => {
+                if (mosquito !== mosquitoElement) {
+                    mosquito.remove();
+                }
+            });
             
-            // 播放击杀音效
-            killAudio.currentTime = 0; // 确保从头开始播放
-            killAudio.play();
-            
-            // 如果背景音乐正在播放，停止它并更新图标
-            if (isPlaying) {
-                bgAudio.pause();
-                audioControl.src = 'media/image/no_audio.png';
-                isPlaying = false;
+            if (totalMosquitoes < 10) {
+                totalMosquitoes++;
             }
             
-            const endTime = new Date();
-            const timeTaken = (endTime - startTime) / 1000;
-            
-            mosquitoElement.src = 'media/image/mosquito_killed.png';
-            setTimeout(() => {
-                overlayElement.style.display = 'block';
-                setTimeout(() => {
-                    overlayElement.style.opacity = '1';
-                }, 50);
-                resultElement.style.display = 'block';
-                killMessageElement.textContent = `你 击杀了 蚊子\n用时：${timeTaken.toFixed(2)}秒`;
-            }, 1500);
-        });
-        
-        function resetGame() {
+            killedMosquitoCount = 0;
             startTime = new Date();
             overlayElement.style.display = 'none';
-            overlayElement.style.opacity = '0'; // 重置遮罩透明度
+            overlayElement.style.opacity = '0';
             resultElement.style.display = 'none';
-            mosquitoElement.src = 'media/image/mosquito.png';
-            mosquitoElement.style.display = 'block';
             
-            // 设置蚊子初始位置为屏幕中央
-            mosquitoElement.style.left = (window.innerWidth / 2 - 25) + 'px';
-            mosquitoElement.style.top = (window.innerHeight / 2 - 25) + 'px';
+            // 创建新的蚊子
+            for (let i = 0; i < totalMosquitoes; i++) {
+                const newMosquito = createNewMosquito();
+                newMosquito.src = 'media/image/mosquito.png';
+                newMosquito.style.display = 'block';
+            }
             
+            // 重新开始时自动播放音频
+            bgAudio.play();
+            audioControl.src = 'media/image/audio.png';
+            isPlaying = true;
+            
+            mosquitoCountElement.textContent = `当前蚊子：${totalMosquitoes}只`;
             startMoving();
         }
         
@@ -195,8 +239,10 @@
             });
         });
         
-        // 开始游戏
-        startMoving();
+        // 移除原有的mosquitoElement点击事件监听器
+        mosquitoElement.remove();
+        // 初始化游戏
+        resetGame();
     </script>
 </body>
 </html> 
